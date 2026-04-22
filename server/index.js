@@ -14,6 +14,7 @@ const path = require("path");
 dotenv.config();
 
 const connectDB = require("./config/db");
+const authRoutes = require("./routes/authRoutes");
 const requestRoutes = require("./routes/requestRoutes");
 const errorHandler = require("./middleware/errorHandler");
 const { initCronJobs } = require("./utils/cronJobs");
@@ -63,7 +64,8 @@ app.use(express.urlencoded({ extended: true }));
 // ---------------------------------------------------------------------------
 // API Routes
 // ---------------------------------------------------------------------------
-app.use("/api/requests", requestRoutes);
+app.use("/api/auth",     authRoutes);     // Public: /register, /login | Private: /me, /availability
+app.use("/api/requests", requestRoutes);  // Mixed: create (public), accept (private via controller)
 
 // Health check endpoint
 app.get("/api/health", (req, res) => {
