@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import axiosInstance from "../api/axiosInstance";
 import RequestCard from "../components/RequestCard";
+import MapView from "../components/MapView";
 import useFCMToken from "../hooks/useFCMToken";
 
 // ---------------------------------------------------------------------------
@@ -123,6 +124,20 @@ const DonorDashboard = () => {
 
   // --- Availability ---
   const [togglingAvail,  setTogglingAvail]  = useState(false);
+
+  // --- View mode & donor coords for map ---
+  const [viewMode,     setViewMode]     = useState("list"); // "list" | "map"
+  const [donorCoords,  setDonorCoords]  = useState(null);
+
+  // Get donor's location for the map on mount
+  useEffect(() => {
+    if (navigator.geolocation) {
+      navigator.geolocation.getCurrentPosition(
+        ({ coords }) => setDonorCoords({ latitude: coords.latitude, longitude: coords.longitude }),
+        () => {} // silently fail — map still shows requests
+      );
+    }
+  }, []);
 
   // ---------------------------------------------------------------------------
   // Fetch nearby requests
@@ -356,6 +371,7 @@ const DonorDashboard = () => {
 
         {/* ── Feed ── */}
         <section>
+          {/* Section header + List/Map toggle */}
           <div className="flex items-center justify-between mb-3">
             <h2 className="text-white font-semibold text-sm">
               Nearby Requests
@@ -363,6 +379,34 @@ const DonorDashboard = () => {
                 <span className="ml-2 text-gray-500 font-normal">({requests.length})</span>
               )}
             </h2>
+
+            {/* View toggle */}
+            <div className="flex rounded-lg bg-white/5 border border-white/10 p-0.5 gap-0.5">
+              <button
+                id="list-view-btn"
+                onClick={() => setViewMode("list")}
+                title="List view"
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition-all duration-150
+                  ${viewMode === "list" ? "bg-white/10 text-white" : "text-gray-500 hover:text-gray-300"}`}
+              >
+                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M4 6h16M4 10h16M4 14h16M4 18h16"/>
+                </svg>
+                List
+              </button>
+              <button
+                id="map-view-btn"
+                onClick={() => setViewMode("map")}
+                title="Map view"
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition-all duration-150
+                  ${viewMode === "map" ? "bg-white/10 text-white" : "text-gray-500 hover:text-gray-300"}`}
+              >
+                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7"/>
+                </svg>
+                Map
+              </button>
+            </div>
           </div>
 
           {loading ? (
@@ -371,6 +415,14 @@ const DonorDashboard = () => {
             <div className="glass-card p-6 text-center text-red-400 text-sm">{error}</div>
           ) : requests.length === 0 ? (
             <EmptyState onRefresh={fetchRequests} />
+          ) : viewMode === "map" ? (
+            <MapView
+              requests={requests}
+              donorCoords={donorCoords}
+              radiusKm={radiusKm}
+              onAccept={handleAccept}
+              acceptingId={acceptingId}
+            />
           ) : (
             <div className="space-y-4">
               {requests.map((req) => (

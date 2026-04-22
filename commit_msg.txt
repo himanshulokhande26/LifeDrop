@@ -1,1 +1,1 @@
-feat: Phase 7 - FCM Web Push (firebase.js, useFCMToken, service worker, fcm-token endpoint, dashboard integration)
+feat: Phase 8 - Map View (Leaflet dark map, urgency pins, radius circle, List/Map toggle, donor pulsing dot)
