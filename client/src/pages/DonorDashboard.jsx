@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import axiosInstance from "../api/axiosInstance";
 import RequestCard from "../components/RequestCard";
+import useFCMToken from "../hooks/useFCMToken";
 
 // ---------------------------------------------------------------------------
 // Sub-components
@@ -98,6 +99,15 @@ const Row = ({ label, value }) => (
 const DonorDashboard = () => {
   const { user, logout, updateAvailability } = useAuth();
   const navigate = useNavigate();
+
+  // --- FCM Push Notifications ---
+  const {
+    permission,
+    loading:           fcmLoading,
+    foregroundMessage,
+    requestPermission,
+    clearForegroundMessage,
+  } = useFCMToken();
 
   // --- Feed state ---
   const [requests,  setRequests]  = useState([]);
@@ -240,6 +250,58 @@ const DonorDashboard = () => {
             </button>
           </div>
         </div>
+
+        {/* ── Notification Permission Banner ── */}
+        {permission === "default" && (
+          <div className="glass-card p-4 flex items-center justify-between gap-3 border-yellow-500/20 ring-1 ring-yellow-500/10">
+            <div className="flex items-center gap-3">
+              <span className="text-2xl">🔔</span>
+              <div>
+                <p className="text-white text-sm font-semibold">Enable Push Notifications</p>
+                <p className="text-gray-400 text-xs">Get instant alerts when nearby blood is needed.</p>
+              </div>
+            </div>
+            <button
+              id="enable-notifications-btn"
+              onClick={requestPermission}
+              disabled={fcmLoading}
+              className="btn-crimson text-xs py-2 px-4 shrink-0"
+            >
+              {fcmLoading ? "Enabling…" : "Enable"}
+            </button>
+          </div>
+        )}
+
+        {permission === "denied" && (
+          <div className="glass-card p-3 flex items-center gap-3 border-red-500/20 ring-1 ring-red-500/10">
+            <span className="text-lg">🔕</span>
+            <p className="text-red-400 text-xs">
+              Notifications are blocked. Enable them in your browser settings to receive push alerts.
+            </p>
+          </div>
+        )}
+
+        {/* ── Foreground Message Toast ── */}
+        {foregroundMessage && (
+          <div className="glass-card p-4 flex items-start justify-between gap-3 border-crimson-500/30 ring-1 ring-crimson-500/20 animate-pulse-once">
+            <div className="flex items-start gap-3">
+              <span className="text-2xl shrink-0">🩸</span>
+              <div>
+                <p className="text-white text-sm font-semibold">{foregroundMessage.title}</p>
+                <p className="text-gray-400 text-xs mt-0.5">{foregroundMessage.body}</p>
+              </div>
+            </div>
+            <button
+              onClick={clearForegroundMessage}
+              className="text-gray-500 hover:text-white transition-colors shrink-0 mt-0.5"
+              aria-label="Dismiss"
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12"/>
+              </svg>
+            </button>
+          </div>
+        )}
 
         {/* ── Filters ── */}
         <div className="flex items-center gap-3 flex-wrap">

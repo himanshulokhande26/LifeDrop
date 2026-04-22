@@ -1,1 +1,1 @@
-feat: Phase 6 - Donor Dashboard, RequestCard, getNearbyRequests, ContactRevealModal, protected routes wired
+feat: Phase 7 - FCM Web Push (firebase.js, useFCMToken, service worker, fcm-token endpoint, dashboard integration)
