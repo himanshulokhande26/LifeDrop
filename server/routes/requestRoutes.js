@@ -1,11 +1,14 @@
 const express = require("express");
 const router = express.Router();
 const { createRequest, acceptRequest } = require("../controllers/requestController");
+const { getNearbyRequests }            = require("../controllers/donorController");
+const authMiddleware                   = require("../middleware/authMiddleware");
 
-// POST /api/requests/create — create a new blood request + find nearby donors
+// Public — anyone can post an emergency request
 router.post("/create", createRequest);
 
-// PUT /api/requests/accept/:requestId — donor accepts a request (Double-Blind reveal)
-router.put("/accept/:requestId", acceptRequest);
+// Private — only authenticated donors
+router.get("/nearby",              authMiddleware, getNearbyRequests);
+router.put("/accept/:requestId",   authMiddleware, acceptRequest);
 
 module.exports = router;

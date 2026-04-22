@@ -145,16 +145,8 @@ const acceptRequest = async (req, res) => {
   try {
     const { requestId } = req.params;
 
-    // In a real flow, donorId comes from req.user (JWT middleware).
-    // For now we accept it from the body for testing purposes.
-    const donorId = req.body.donorId || req.user?._id;
-
-    if (!donorId) {
-      return res.status(401).json({
-        success: false,
-        message: "Authentication required. Donor ID not found.",
-      });
-    }
+    // donorId is set by authMiddleware from the verified JWT — never trust the body
+    const donorId = req.user.id;
 
     // --- 1. Find request — include contactPhone via explicit select ---
     const request = await EmergencyRequest.findById(requestId).select("+contactPhone");
