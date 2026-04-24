@@ -2,144 +2,67 @@ import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 
-// ---------------------------------------------------------------------------
-// Constants
-// ---------------------------------------------------------------------------
 const BLOOD_GROUPS = ["A+", "A-", "B+", "B-", "AB+", "AB-", "O+", "O-"];
 
-// ---------------------------------------------------------------------------
-// Sub-components
-// ---------------------------------------------------------------------------
+// ── Spinner ─────────────────────────────────────────────────────────────────
 const Spinner = () => (
-  <svg className="animate-spin w-5 h-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+  <svg className="animate-spin w-4 h-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
     <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
     <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
   </svg>
 );
 
-const InputField = ({ id, label, type = "text", value, onChange, placeholder, required, maxLength, hint }) => (
-  <div>
-    <label htmlFor={id} className="form-label">
-      {label}
-      {hint && <span className="ml-1 text-gray-600 normal-case font-normal">{hint}</span>}
-    </label>
-    <input
-      id={id}
-      name={id}
-      type={type}
-      value={value}
-      onChange={onChange}
-      placeholder={placeholder}
-      required={required}
-      maxLength={maxLength}
-      className="input-field"
-      autoComplete="off"
-    />
-  </div>
-);
-
-// ---------------------------------------------------------------------------
-// AuthPage Component
-// ---------------------------------------------------------------------------
-/**
- * AuthPage
- * --------
- * Combined Login + Register page with smooth tab switching.
- * Register also captures location and blood group for donor matching.
- */
+// ── AuthPage ─────────────────────────────────────────────────────────────────
 const AuthPage = () => {
   const navigate = useNavigate();
   const { login, register } = useAuth();
 
-  // --- Tab: "login" | "register" ---
-  const [mode, setMode] = useState("login");
-
-  // --- Shared fields ---
+  const [mode,        setMode]        = useState("login");
   const [phoneNumber, setPhoneNumber] = useState("");
   const [password,    setPassword]    = useState("");
+  const [name,        setName]        = useState("");
+  const [bloodGroup,  setBloodGroup]  = useState("");
+  const [coords,      setCoords]      = useState(null);
+  const [locating,    setLocating]    = useState(false);
+  const [submitting,  setSubmitting]  = useState(false);
+  const [error,       setError]       = useState("");
+  const [showPass,    setShowPass]    = useState(false);
 
-  // --- Register-only fields ---
-  const [name,       setName]       = useState("");
-  const [bloodGroup, setBloodGroup] = useState("");
-  const [coords,     setCoords]     = useState(null);
-
-  // --- UI state ---
-  const [locating,   setLocating]   = useState(false);
-  const [submitting, setSubmitting] = useState(false);
-  const [error,      setError]      = useState("");
-  const [showPass,   setShowPass]   = useState(false);
-
-  // ---------------------------------------------------------------------------
-  // Reset form when switching tabs
-  // ---------------------------------------------------------------------------
-  const switchMode = (newMode) => {
-    setMode(newMode);
-    setError("");
-    setPhoneNumber("");
-    setPassword("");
-    setName("");
-    setBloodGroup("");
-    setCoords(null);
+  const switchMode = (m) => {
+    setMode(m); setError("");
+    setPhoneNumber(""); setPassword("");
+    setName(""); setBloodGroup(""); setCoords(null);
   };
 
-  // ---------------------------------------------------------------------------
-  // Geolocation
-  // ---------------------------------------------------------------------------
   const handleGetLocation = () => {
-    if (!navigator.geolocation) {
-      setError("Geolocation is not supported by your browser.");
-      return;
-    }
-    setLocating(true);
-    setError("");
+    if (!navigator.geolocation) return setError("Geolocation not supported.");
+    setLocating(true); setError("");
     navigator.geolocation.getCurrentPosition(
-      ({ coords: { latitude, longitude } }) => {
-        setCoords({ latitude, longitude });
-        setLocating(false);
-      },
+      ({ coords: { latitude, longitude } }) => { setCoords({ latitude, longitude }); setLocating(false); },
       (err) => {
         setLocating(false);
-        setError(
-          err.code === 1
-            ? "Location access denied. Please allow location in your browser settings."
-            : "Unable to fetch location. Please try again."
-        );
+        setError(err.code === 1 ? "Location denied. Allow location in browser settings." : "Unable to get location.");
       },
       { enableHighAccuracy: true, timeout: 10000 }
     );
   };
 
-  // ---------------------------------------------------------------------------
-  // Submit
-  // ---------------------------------------------------------------------------
   const handleSubmit = async (e) => {
-    e.preventDefault();
-    setError("");
-
-    // Validation
+    e.preventDefault(); setError("");
     if (mode === "register") {
-      if (!name.trim())   return setError("Please enter your name.");
-      if (!bloodGroup)    return setError("Please select your blood group.");
-      if (!coords)        return setError("Please capture your location first.");
+      if (!name.trim())  return setError("Enter your full name.");
+      if (!bloodGroup)   return setError("Select your blood group.");
+      if (!coords)       return setError("Capture your location first.");
     }
-    if (!phoneNumber || phoneNumber.length !== 10)
-      return setError("Please enter a valid 10-digit phone number.");
-    if (password.length < 6)
-      return setError("Password must be at least 6 characters.");
+    if (!phoneNumber || phoneNumber.length !== 10) return setError("Enter a valid 10-digit number.");
+    if (password.length < 6) return setError("Password must be at least 6 characters.");
 
     setSubmitting(true);
     try {
       if (mode === "login") {
         await login({ phoneNumber, password });
       } else {
-        await register({
-          name,
-          bloodGroup,
-          phoneNumber,
-          password,
-          longitude: coords.longitude,
-          latitude:  coords.latitude,
-        });
+        await register({ name, bloodGroup, phoneNumber, password, longitude: coords.longitude, latitude: coords.latitude });
       }
       navigate("/dashboard");
     } catch (err) {
@@ -149,49 +72,100 @@ const AuthPage = () => {
     }
   };
 
-  // ---------------------------------------------------------------------------
-  // Render
-  // ---------------------------------------------------------------------------
   return (
-    <div className="min-h-screen bg-gray-950 flex items-center justify-center px-4 py-12">
+    <div className="min-h-screen bg-[#080d1a] flex">
 
-      {/* Background ambient glows */}
-      <div aria-hidden="true" className="pointer-events-none fixed inset-0 overflow-hidden">
-        <div className="absolute -top-60 -left-60 w-[700px] h-[700px] rounded-full bg-crimson-800/20 blur-[150px]" />
-        <div className="absolute -bottom-60 -right-60 w-[600px] h-[600px] rounded-full bg-crimson-900/15 blur-[120px]" />
-      </div>
+      {/* ── Left panel (desktop only) ── */}
+      <div className="hidden lg:flex flex-col justify-between w-[44%] bg-[#0a0f1e] border-r border-white/[0.06] p-12">
+        {/* Back to home */}
+        <button
+          onClick={() => navigate("/")}
+          className="flex items-center gap-2 text-sm text-gray-500 hover:text-white transition-colors w-fit"
+        >
+          <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" d="M10.5 19.5L3 12m0 0l7.5-7.5M3 12h18" />
+          </svg>
+          Back to Home
+        </button>
 
-      <div className="relative w-full max-w-md">
-
-        {/* Logo + Brand */}
-        <div className="text-center mb-8">
-          <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-crimson-600/20 border border-crimson-500/30 mb-4">
-            <svg className="w-8 h-8 text-crimson-400" fill="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-              <path d="M12 21.593c-5.63-5.539-11-10.297-11-14.402 0-3.791 3.068-5.191 5.281-5.191 1.312 0 4.151.501 5.719 4.457 1.59-3.968 4.464-4.447 5.726-4.447 2.54 0 5.274 1.621 5.274 5.181 0 4.069-5.136 8.625-11 14.402z"/>
-            </svg>
+        {/* Center content */}
+        <div>
+          <div className="flex items-center gap-3 mb-10">
+            <div className="w-10 h-10 rounded-xl bg-red-500/20 border border-red-500/30 flex items-center justify-center">
+              <svg className="w-5 h-5 text-red-400" fill="currentColor" viewBox="0 0 24 24">
+                <path d="M12 21.593c-5.63-5.539-11-10.297-11-14.402 0-3.791 3.068-5.191 5.281-5.191 1.312 0 4.151.501 5.719 4.457 1.59-3.968 4.464-4.447 5.726-4.447 2.54 0 5.274 1.621 5.274 5.181 0 4.069-5.136 8.625-11 14.402z" />
+              </svg>
+            </div>
+            <span className="text-lg font-bold">LifeDrop</span>
           </div>
-          <h1 className="text-3xl font-bold text-white tracking-tight">LifeDrop</h1>
-          <p className="mt-1.5 text-gray-400 text-sm">
-            {mode === "login" ? "Welcome back. Every second counts." : "Join the network. Save a life today."}
+
+          <h2 className="text-3xl font-bold text-gradient mb-4 leading-snug">
+            Join the network.<br />Save a life today.
+          </h2>
+          <p className="text-gray-500 text-sm leading-relaxed mb-10">
+            Register as a blood donor and receive instant alerts when someone near you needs your blood group.
           </p>
+
+          {/* Trust points */}
+          {[
+            "Your phone number is never shown publicly",
+            "Contact revealed only after you accept",
+            "Geo-matched to donors within your radius",
+          ].map((point) => (
+            <div key={point} className="flex items-start gap-3 mb-4">
+              <div className="w-5 h-5 rounded-full bg-green-500/10 border border-green-500/20 flex items-center justify-center shrink-0 mt-0.5">
+                <svg className="w-2.5 h-2.5 text-green-400" fill="none" stroke="currentColor" strokeWidth={2.5} viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                </svg>
+              </div>
+              <p className="text-sm text-gray-400">{point}</p>
+            </div>
+          ))}
         </div>
 
-        {/* Card */}
-        <div className="glass-card p-6 sm:p-8">
+        <p className="text-xs text-gray-700">© 2025 LifeDrop · Built for educational purposes</p>
+      </div>
 
-          {/* Tab Switcher */}
-          <div className="flex rounded-xl bg-white/5 p-1 mb-6 gap-1">
+      {/* ── Right panel — Form ── */}
+      <div className="flex-1 flex flex-col items-center justify-center px-6 py-12">
+
+        {/* Mobile back button */}
+        <div className="w-full max-w-sm mb-6 lg:hidden">
+          <button
+            onClick={() => navigate("/")}
+            className="flex items-center gap-1.5 text-sm text-gray-500 hover:text-white transition-colors"
+          >
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M10.5 19.5L3 12m0 0l7.5-7.5M3 12h18" />
+            </svg>
+            Home
+          </button>
+        </div>
+
+        <div className="w-full max-w-sm">
+
+          {/* Header */}
+          <div className="mb-7">
+            <h1 className="text-2xl font-bold text-white">
+              {mode === "login" ? "Welcome back" : "Create an account"}
+            </h1>
+            <p className="text-sm text-gray-500 mt-1">
+              {mode === "login"
+                ? "Log in to your donor dashboard."
+                : "Register to start receiving blood requests."}
+            </p>
+          </div>
+
+          {/* Tab switcher */}
+          <div className="flex bg-white/[0.04] border border-white/[0.07] rounded-xl p-1 mb-6 gap-1">
             {["login", "register"].map((tab) => (
               <button
                 key={tab}
                 type="button"
                 id={`tab-${tab}`}
                 onClick={() => switchMode(tab)}
-                className={`flex-1 py-2 rounded-lg text-sm font-semibold capitalize transition-all duration-200
-                  ${mode === tab
-                    ? "bg-crimson-600 text-white shadow-lg shadow-crimson-900/40"
-                    : "text-gray-400 hover:text-white"
-                  }`}
+                className={`flex-1 py-2 rounded-lg text-sm font-medium transition-all duration-200
+                  ${mode === tab ? "bg-white/[0.08] text-white" : "text-gray-500 hover:text-gray-300"}`}
               >
                 {tab === "login" ? "Log In" : "Register"}
               </button>
@@ -201,135 +175,112 @@ const AuthPage = () => {
           {/* Form */}
           <form onSubmit={handleSubmit} noValidate className="space-y-4">
 
-            {/* Register-only: Name */}
             {mode === "register" && (
-              <InputField
-                id="name"
-                label="Full Name"
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                placeholder="e.g. Priya Sharma"
-                required
-              />
+              <div>
+                <label htmlFor="name" className="form-label">Full Name</label>
+                <input id="name" type="text" value={name} onChange={e => setName(e.target.value)}
+                  placeholder="e.g. Priya Sharma" className="input-field" autoComplete="off" />
+              </div>
             )}
 
-            {/* Register-only: Blood Group */}
             {mode === "register" && (
               <div>
                 <label htmlFor="bloodGroup" className="form-label">Blood Group</label>
-                <select
-                  id="bloodGroup"
-                  value={bloodGroup}
-                  onChange={(e) => setBloodGroup(e.target.value)}
-                  className="input-field appearance-none cursor-pointer"
-                  required
-                >
-                  <option value="" disabled>Select your blood group…</option>
-                  {BLOOD_GROUPS.map((bg) => (
-                    <option key={bg} value={bg}>{bg}</option>
-                  ))}
+                <select id="bloodGroup" value={bloodGroup} onChange={e => setBloodGroup(e.target.value)}
+                  className="input-field appearance-none cursor-pointer">
+                  <option value="" disabled>Select blood group…</option>
+                  {BLOOD_GROUPS.map(bg => <option key={bg} value={bg}>{bg}</option>)}
                 </select>
               </div>
             )}
 
-            {/* Phone Number */}
-            <InputField
-              id="phoneNumber"
-              label="Phone Number"
-              type="tel"
-              value={phoneNumber}
-              onChange={(e) => setPhoneNumber(e.target.value.replace(/\D/g, ""))}
-              placeholder="10-digit mobile number"
-              required
-              maxLength={10}
-              hint="(used as your login ID)"
-            />
+            <div>
+              <label htmlFor="phoneNumber" className="form-label">
+                Phone Number
+                <span className="ml-1.5 font-normal normal-case text-gray-600">· used as your login ID</span>
+              </label>
+              <input id="phoneNumber" type="tel" value={phoneNumber}
+                onChange={e => setPhoneNumber(e.target.value.replace(/\D/g, ""))}
+                placeholder="10-digit mobile number" maxLength={10} className="input-field" autoComplete="off" />
+            </div>
 
-            {/* Password */}
             <div>
               <label htmlFor="password" className="form-label">Password</label>
               <div className="relative">
-                <input
-                  id="password"
-                  type={showPass ? "text" : "password"}
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
+                <input id="password" type={showPass ? "text" : "password"} value={password}
+                  onChange={e => setPassword(e.target.value)}
                   placeholder={mode === "register" ? "Min. 6 characters" : "Your password"}
-                  className="input-field pr-10"
-                  required
-                  minLength={6}
-                />
-                <button
-                  type="button"
-                  onClick={() => setShowPass((p) => !p)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-300 transition-colors"
-                  aria-label={showPass ? "Hide password" : "Show password"}
-                >
+                  className="input-field pr-10" minLength={6} />
+                <button type="button" onClick={() => setShowPass(p => !p)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-600 hover:text-gray-300 transition-colors"
+                  aria-label="Toggle password visibility">
                   {showPass ? (
                     <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268 2.943 9.543 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21"/>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M3.98 8.223A10.477 10.477 0 001.934 12C3.226 16.338 7.244 19.5 12 19.5c.993 0 1.953-.138 2.863-.395M6.228 6.228A10.45 10.45 0 0112 4.5c4.756 0 8.773 3.162 10.065 7.498a10.523 10.523 0 01-4.293 5.774M6.228 6.228L3 3m3.228 3.228l3.65 3.65m7.894 7.894L21 21m-3.228-3.228l-3.65-3.65m0 0a3 3 0 10-4.243-4.243m4.242 4.242L9.88 9.88" />
                     </svg>
                   ) : (
                     <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M2.036 12.322a1.012 1.012 0 010-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.963-7.178z" />
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
                     </svg>
                   )}
                 </button>
               </div>
             </div>
 
-            {/* Register-only: Location */}
+            {/* Location (register only) */}
             {mode === "register" && (
               <div>
-                <p className="form-label">Your Location <span className="text-gray-600 normal-case font-normal">(for nearby matching)</span></p>
-                <button
-                  id="get-location-btn"
-                  type="button"
-                  onClick={handleGetLocation}
+                <label className="form-label">
+                  Your Location
+                  <span className="ml-1.5 font-normal normal-case text-gray-600">· for nearby matching</span>
+                </label>
+                <button id="get-location-btn" type="button" onClick={handleGetLocation}
                   disabled={locating || submitting}
-                  className="btn-ghost w-full flex items-center justify-center gap-2.5"
+                  className={`w-full flex items-center justify-center gap-2.5 py-3 rounded-xl text-sm font-medium border transition-all duration-150
+                    ${coords
+                      ? "bg-green-500/10 border-green-500/20 text-green-300"
+                      : "bg-white/[0.04] border-white/[0.1] text-gray-400 hover:text-white hover:border-white/20"
+                    }`}
                 >
                   {locating ? (
-                    <><Spinner /> Fetching…</>
+                    <><Spinner /> Fetching location…</>
                   ) : coords ? (
                     <>
                       <svg className="w-4 h-4 text-green-400" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7"/>
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
                       </svg>
-                      <span className="text-green-400">Location Captured</span>
-                      <span className="text-gray-500 text-xs">
+                      Location Captured
+                      <span className="text-gray-500 text-xs font-normal">
                         ({coords.latitude.toFixed(4)}, {coords.longitude.toFixed(4)})
                       </span>
                     </>
                   ) : (
                     <>
                       <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"/>
-                        <path strokeLinecap="round" strokeLinejoin="round" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"/>
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M15 10.5a3 3 0 11-6 0 3 3 0 016 0z" />
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 10.5c0 7.142-7.5 11.25-7.5 11.25S4.5 17.642 4.5 10.5a7.5 7.5 0 1115 0z" />
                       </svg>
-                      Get Current Location
+                      Detect Current Location
                     </>
                   )}
                 </button>
               </div>
             )}
 
-            {/* Error Banner */}
+            {/* Error */}
             {error && (
-              <div role="alert" className="flex items-start gap-2.5 rounded-xl border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-300">
-                <span className="mt-0.5">⚠️</span>
+              <div role="alert" className="flex items-start gap-2.5 rounded-xl border border-red-500/20 bg-red-500/10 px-4 py-3 text-sm text-red-300">
+                <svg className="w-4 h-4 shrink-0 mt-0.5" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m9-.75a9 9 0 11-18 0 9 9 0 0118 0zm-9 3.75h.008v.008H12v-.008z" />
+                </svg>
                 <p>{error}</p>
               </div>
             )}
 
             {/* Submit */}
-            <button
-              id="auth-submit-btn"
-              type="submit"
-              disabled={submitting || locating}
-              className="btn-crimson w-full flex items-center justify-center gap-2.5 text-base mt-1"
-            >
+            <button id="auth-submit-btn" type="submit" disabled={submitting || locating}
+              className="btn-primary w-full py-3 text-sm mt-1">
               {submitting ? (
                 <><Spinner />{mode === "login" ? "Logging in…" : "Creating account…"}</>
               ) : (
@@ -338,29 +289,23 @@ const AuthPage = () => {
             </button>
           </form>
 
-          {/* Footer */}
-          <p className="mt-5 text-center text-xs text-gray-600">
-            🔒 Your phone number is kept private and never shared publicly.
+          {/* Mode switch */}
+          <p className="mt-5 text-center text-sm text-gray-600">
+            {mode === "login" ? (
+              <>Don't have an account?{" "}
+                <button onClick={() => switchMode("register")} className="text-red-400 hover:text-red-300 font-medium transition-colors">
+                  Register as a donor
+                </button>
+              </>
+            ) : (
+              <>Already have an account?{" "}
+                <button onClick={() => switchMode("login")} className="text-red-400 hover:text-red-300 font-medium transition-colors">
+                  Log in
+                </button>
+              </>
+            )}
           </p>
         </div>
-
-        {/* Switch mode hint */}
-        <p className="mt-4 text-center text-sm text-gray-500">
-          {mode === "login" ? (
-            <>Don't have an account?{" "}
-              <button onClick={() => switchMode("register")} className="text-crimson-400 hover:text-crimson-300 font-medium transition-colors">
-                Register as a donor
-              </button>
-            </>
-          ) : (
-            <>Already have an account?{" "}
-              <button onClick={() => switchMode("login")} className="text-crimson-400 hover:text-crimson-300 font-medium transition-colors">
-                Log in
-              </button>
-            </>
-          )}
-        </p>
-
       </div>
     </div>
   );

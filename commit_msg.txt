@@ -1,0 +1,1 @@
+feat: UI overhaul - Landing Page, clean AuthPage split-panel, new design system (minimal, industry-standard)
