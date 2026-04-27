@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
+import { sendFirebasePhoneOtp, verifyFirebasePhoneOtp } from "../utils/firebasePhoneAuth";
 
 const BLOOD_GROUPS = ["A+", "A-", "B+", "B-", "AB+", "AB-", "O+", "O-"];
 
@@ -27,11 +28,26 @@ const AuthPage = () => {
   const [submitting,  setSubmitting]  = useState(false);
   const [error,       setError]       = useState("");
   const [showPass,    setShowPass]    = useState(false);
+  const [otp,         setOtp]         = useState("");
+  const [otpSent,     setOtpSent]     = useState(false);
+  const [otpSending,  setOtpSending]  = useState(false);
+  const [otpVerifying,setOtpVerifying]= useState(false);
+  const [phoneVerificationToken, setPhoneVerificationToken] = useState("");
+  const [confirmationResult, setConfirmationResult] = useState(null);
 
   const switchMode = (m) => {
     setMode(m); setError("");
     setPhoneNumber(""); setPassword("");
     setName(""); setBloodGroup(""); setCoords(null);
+    setOtp(""); setOtpSent(false); setPhoneVerificationToken(""); setConfirmationResult(null);
+  };
+
+  const resetPhoneVerification = (nextPhone) => {
+    setPhoneNumber(nextPhone);
+    setOtp("");
+    setOtpSent(false);
+    setPhoneVerificationToken("");
+    setConfirmationResult(null);
   };
 
   const handleGetLocation = () => {
@@ -47,12 +63,45 @@ const AuthPage = () => {
     );
   };
 
+  const handleRequestOtp = async () => {
+    setError("");
+    if (!phoneNumber || phoneNumber.length !== 10) return setError("Enter a valid 10-digit number first.");
+
+    setOtpSending(true);
+    try {
+      const result = await sendFirebasePhoneOtp(phoneNumber, "auth-recaptcha-container");
+      setConfirmationResult(result);
+      setOtpSent(true);
+    } catch (err) {
+      setError(err.message || "Could not send OTP. Please try again.");
+    } finally {
+      setOtpSending(false);
+    }
+  };
+
+  const handleVerifyOtp = async () => {
+    setError("");
+    if (!otp || otp.length !== 6) return setError("Enter the 6-digit OTP.");
+    if (!confirmationResult) return setError("Send OTP first.");
+
+    setOtpVerifying(true);
+    try {
+      const idToken = await verifyFirebasePhoneOtp(confirmationResult, otp);
+      setPhoneVerificationToken(idToken);
+    } catch (err) {
+      setError(err.message || "Invalid OTP. Please try again.");
+    } finally {
+      setOtpVerifying(false);
+    }
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault(); setError("");
     if (mode === "register") {
       if (!name.trim())  return setError("Enter your full name.");
       if (!bloodGroup)   return setError("Select your blood group.");
       if (!coords)       return setError("Capture your location first.");
+      if (!phoneVerificationToken) return setError("Verify your phone number with OTP first.");
     }
     if (!phoneNumber || phoneNumber.length !== 10) return setError("Enter a valid 10-digit number.");
     if (password.length < 6) return setError("Password must be at least 6 characters.");
@@ -62,7 +111,15 @@ const AuthPage = () => {
       if (mode === "login") {
         await login({ phoneNumber, password });
       } else {
-        await register({ name, bloodGroup, phoneNumber, password, longitude: coords.longitude, latitude: coords.latitude });
+        await register({
+          name,
+          bloodGroup,
+          phoneNumber,
+          password,
+          longitude: coords.longitude,
+          latitude: coords.latitude,
+          phoneVerificationToken,
+        });
       }
       navigate("/dashboard");
     } catch (err) {
@@ -200,9 +257,37 @@ const AuthPage = () => {
                 <span className="ml-1.5 font-normal normal-case text-gray-600">· used as your login ID</span>
               </label>
               <input id="phoneNumber" type="tel" value={phoneNumber}
-                onChange={e => setPhoneNumber(e.target.value.replace(/\D/g, ""))}
+                onChange={e => resetPhoneVerification(e.target.value.replace(/\D/g, ""))}
                 placeholder="10-digit mobile number" maxLength={10} className="input-field" autoComplete="off" />
             </div>
+
+            {mode === "register" && (
+              <div className="space-y-3">
+                <button type="button" onClick={handleRequestOtp}
+                  disabled={otpSending || submitting || phoneVerificationToken}
+                  className={`w-full flex items-center justify-center gap-2.5 py-3 rounded-xl text-sm font-medium border transition-all duration-150
+                    ${phoneVerificationToken
+                      ? "bg-green-500/10 border-green-500/20 text-green-300"
+                      : "bg-white/[0.04] border-white/[0.1] text-gray-400 hover:text-white hover:border-white/20"
+                    }`}
+                >
+                  {otpSending ? <><Spinner /> Sending OTP...</> : phoneVerificationToken ? "Phone Verified" : otpSent ? "Resend OTP" : "Send OTP"}
+                </button>
+
+                {otpSent && !phoneVerificationToken && (
+                  <div className="flex gap-2">
+                    <input id="otp" type="tel" value={otp}
+                      onChange={e => setOtp(e.target.value.replace(/\D/g, ""))}
+                      placeholder="6-digit OTP" maxLength={6} className="input-field" autoComplete="one-time-code" />
+                    <button type="button" onClick={handleVerifyOtp}
+                      disabled={otpVerifying || otp.length !== 6}
+                      className="btn-primary px-4 text-sm shrink-0">
+                      {otpVerifying ? <Spinner /> : "Verify"}
+                    </button>
+                  </div>
+                )}
+              </div>
+            )}
 
             <div>
               <label htmlFor="password" className="form-label">Password</label>
@@ -269,6 +354,8 @@ const AuthPage = () => {
             )}
 
             {/* Error */}
+            <div id="auth-recaptcha-container" />
+
             {error && (
               <div role="alert" className="flex items-start gap-2.5 rounded-xl border border-red-500/20 bg-red-500/10 px-4 py-3 text-sm text-red-300">
                 <svg className="w-4 h-4 shrink-0 mt-0.5" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
@@ -279,7 +366,7 @@ const AuthPage = () => {
             )}
 
             {/* Submit */}
-            <button id="auth-submit-btn" type="submit" disabled={submitting || locating}
+            <button id="auth-submit-btn" type="submit" disabled={submitting || locating || otpSending || otpVerifying}
               className="btn-primary w-full py-3 text-sm mt-1">
               {submitting ? (
                 <><Spinner />{mode === "login" ? "Logging in…" : "Creating account…"}</>

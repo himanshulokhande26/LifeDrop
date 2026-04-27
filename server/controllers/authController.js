@@ -1,6 +1,10 @@
 const User = require("../models/User");
 const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
+const {
+  normalizePhoneNumber,
+  verifyFirebasePhoneToken,
+} = require("../utils/phoneVerificationService");
 
 // ---------------------------------------------------------------------------
 // Helper: Generate a signed JWT
@@ -38,19 +42,30 @@ const register = async (req, res) => {
       password,
       longitude,
       latitude,
+      phoneVerificationToken,
     } = req.body;
 
+    const normalizedPhoneNumber = normalizePhoneNumber(phoneNumber);
+
     // --- Input validation ---
-    if (!name || !bloodGroup || !phoneNumber || !password || !longitude || !latitude) {
+    if (!name || !bloodGroup || !normalizedPhoneNumber || !password || !longitude || !latitude || !phoneVerificationToken) {
       return res.status(400).json({
         success: false,
-        message: "Please provide name, bloodGroup, phoneNumber, password, longitude and latitude.",
+        message: "Please provide name, bloodGroup, phoneNumber, password, longitude, latitude and phoneVerificationToken.",
+      });
+    }
+
+    const phoneVerified = await verifyFirebasePhoneToken(phoneVerificationToken, normalizedPhoneNumber);
+    if (!phoneVerified) {
+      return res.status(401).json({
+        success: false,
+        message: "Firebase phone verification is required before registration.",
       });
     }
 
     // --- Check for duplicate phone number ---
     // We temporarily unset select:false for this lookup only
-    const existing = await User.findOne({ hiddenPhoneNumber: phoneNumber }).select("+hiddenPhoneNumber");
+    const existing = await User.findOne({ hiddenPhoneNumber: normalizedPhoneNumber }).select("+hiddenPhoneNumber");
     if (existing) {
       return res.status(409).json({
         success: false,
@@ -66,7 +81,9 @@ const register = async (req, res) => {
     const user = await User.create({
       name,
       bloodGroup,
-      hiddenPhoneNumber: phoneNumber,
+      hiddenPhoneNumber: normalizedPhoneNumber,
+      phoneVerified: true,
+      phoneVerifiedAt: new Date(),
       password: hashedPassword,
       location: {
         type: "Point",
@@ -86,6 +103,7 @@ const register = async (req, res) => {
         name:       user.name,
         bloodGroup: user.bloodGroup,
         isAvailable: user.isAvailable,
+        phoneVerified: user.phoneVerified,
       },
     });
   } catch (error) {
@@ -112,7 +130,8 @@ const register = async (req, res) => {
  */
 const login = async (req, res) => {
   try {
-    const { phoneNumber, password } = req.body;
+    const { password } = req.body;
+    const phoneNumber = normalizePhoneNumber(req.body.phoneNumber);
 
     if (!phoneNumber || !password) {
       return res.status(400).json({
@@ -155,6 +174,7 @@ const login = async (req, res) => {
         bloodGroup:  user.bloodGroup,
         isAvailable: user.isAvailable,
         fcmToken:    user.fcmToken,
+        phoneVerified: user.phoneVerified,
       },
     });
   } catch (error) {
@@ -189,6 +209,7 @@ const getMe = async (req, res) => {
         bloodGroup:  user.bloodGroup,
         isAvailable: user.isAvailable,
         fcmToken:    user.fcmToken,
+        phoneVerified: user.phoneVerified,
         location:    user.location,
         createdAt:   user.createdAt,
       },
@@ -257,5 +278,10 @@ const updateFcmToken = async (req, res) => {
   }
 };
 
-module.exports = { register, login, getMe, updateAvailability, updateFcmToken };
-
+module.exports = {
+  register,
+  login,
+  getMe,
+  updateAvailability,
+  updateFcmToken,
+};

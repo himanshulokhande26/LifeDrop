@@ -34,6 +34,7 @@ Built as an engineering project, LifeDrop demonstrates:
 | Feature | Description |
 |---|---|
 | 🔐 **Auth System** | JWT-based register/login with bcrypt password hashing |
+| 📱 **Phone Verification** | Firebase Phone Auth (OTP) required for donors and requesters to prevent spam |
 | 📍 **Geospatial Matching** | Finds donors within a configurable radius (5/10/25 km) using MongoDB 2dsphere indexes |
 | 🙈 **Double-Blind Privacy** | Patient's phone number is hidden until a donor explicitly accepts |
 | 🔔 **Push Notifications** | Firebase Cloud Messaging (FCM) Web Push with Fast2SMS SMS fallback |
@@ -52,12 +53,12 @@ Built as an engineering project, LifeDrop demonstrates:
 - **React Router DOM** — Client-side routing
 - **Axios** — HTTP client with JWT interceptors
 - **Leaflet.js / React-Leaflet** — Interactive geospatial map
-- **Firebase JS SDK** — Web Push notifications
+- **Firebase JS SDK** — Web Push notifications & Phone Auth (Recaptcha/OTP)
 
 ### Backend
 - **Node.js + Express.js** — REST API server
 - **MongoDB + Mongoose** — Database with geospatial indexing
-- **Firebase Admin SDK** — Server-side FCM push notifications
+- **Firebase Admin SDK** — Server-side FCM push notifications & Auth Token verification
 - **Fast2SMS** — SMS fallback notifications
 - **node-cron** — Scheduled auto-expiry jobs
 - **bcryptjs** — Password hashing

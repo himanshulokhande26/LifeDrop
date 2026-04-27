@@ -1,5 +1,6 @@
 import { useState } from "react";
 import axiosInstance from "../api/axiosInstance";
+import { sendFirebasePhoneOtp, verifyFirebasePhoneOtp } from "../utils/firebasePhoneAuth";
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -89,13 +90,75 @@ const CreateRequestForm = () => {
   const [locating, setLocating]     = useState(false); // Geo fetch in progress
   const [submitting, setSubmitting] = useState(false); // API call in progress
   const [status, setStatus]         = useState(null);  // { type, message }
+  const [otp, setOtp]               = useState("");
+  const [otpSent, setOtpSent]       = useState(false);
+  const [otpSending, setOtpSending] = useState(false);
+  const [otpVerifying, setOtpVerifying] = useState(false);
+  const [phoneVerificationToken, setPhoneVerificationToken] = useState("");
+  const [confirmationResult, setConfirmationResult] = useState(null);
 
   // --- Form field change handler ---
   const handleChange = (e) => {
     const { name, value } = e.target;
-    setForm((prev) => ({ ...prev, [name]: value }));
+    const nextValue = name === "contactPhone" ? value.replace(/\D/g, "") : value;
+    setForm((prev) => ({ ...prev, [name]: nextValue }));
+    if (name === "contactPhone") {
+      setOtp("");
+      setOtpSent(false);
+      setPhoneVerificationToken("");
+      setConfirmationResult(null);
+    }
     // Clear status message on any change so feedback feels fresh
     setStatus(null);
+  };
+
+  const handleRequestOtp = async () => {
+    setStatus(null);
+    if (!form.contactPhone || form.contactPhone.length !== 10) {
+      setStatus({ type: "error", message: "Enter a valid 10-digit contact phone first." });
+      return;
+    }
+
+    setOtpSending(true);
+    try {
+      const result = await sendFirebasePhoneOtp(form.contactPhone, "request-recaptcha-container");
+      setConfirmationResult(result);
+      setOtpSent(true);
+      setStatus({ type: "success", message: "OTP sent to the contact phone." });
+    } catch (error) {
+      setStatus({
+        type: "error",
+        message: error.message || "Could not send OTP. Please try again.",
+      });
+    } finally {
+      setOtpSending(false);
+    }
+  };
+
+  const handleVerifyOtp = async () => {
+    setStatus(null);
+    if (!otp || otp.length !== 6) {
+      setStatus({ type: "error", message: "Enter the 6-digit OTP." });
+      return;
+    }
+    if (!confirmationResult) {
+      setStatus({ type: "error", message: "Send OTP first." });
+      return;
+    }
+
+    setOtpVerifying(true);
+    try {
+      const idToken = await verifyFirebasePhoneOtp(confirmationResult, otp);
+      setPhoneVerificationToken(idToken);
+      setStatus({ type: "success", message: "Contact phone verified." });
+    } catch (error) {
+      setStatus({
+        type: "error",
+        message: error.message || "Invalid OTP. Please try again.",
+      });
+    } finally {
+      setOtpVerifying(false);
+    }
   };
 
   // ---------------------------------------------------------------------------
@@ -153,10 +216,12 @@ const CreateRequestForm = () => {
   // Form validation
   // ---------------------------------------------------------------------------
   const validate = () => {
-    const { patientName, requiredBloodGroup, hospitalName } = form;
+    const { patientName, requiredBloodGroup, hospitalName, contactPhone } = form;
     if (!patientName.trim())        return "Patient name is required.";
     if (!requiredBloodGroup)        return "Please select a blood group.";
     if (!hospitalName.trim())       return "Hospital name is required.";
+    if (!contactPhone || contactPhone.length !== 10) return "Contact phone is required.";
+    if (!phoneVerificationToken)    return "Please verify the contact phone with OTP.";
     if (!coords)                    return "Please capture your location first.";
     return null;
   };
@@ -181,6 +246,7 @@ const CreateRequestForm = () => {
         ...form,
         longitude: coords.longitude,
         latitude:  coords.latitude,
+        phoneVerificationToken,
       };
 
       const response = await axiosInstance.post("/requests/create", payload);
@@ -200,6 +266,10 @@ const CreateRequestForm = () => {
         contactPhone:       "",
       });
       setCoords(null);
+      setOtp("");
+      setOtpSent(false);
+      setPhoneVerificationToken("");
+      setConfirmationResult(null);
     } catch (error) {
       const message =
         error.response?.data?.message ||
@@ -351,6 +421,44 @@ const CreateRequestForm = () => {
               />
             </div>
 
+            <div className="space-y-3">
+              <button
+                type="button"
+                onClick={handleRequestOtp}
+                disabled={otpSending || submitting || phoneVerificationToken}
+                className={`w-full flex items-center justify-center gap-2.5 py-3 rounded-xl text-sm font-medium border transition-all duration-150
+                  ${phoneVerificationToken
+                    ? "bg-green-500/10 border-green-500/20 text-green-300"
+                    : "bg-white/[0.04] border-white/[0.1] text-gray-400 hover:text-white hover:border-white/20"
+                  }`}
+              >
+                {otpSending ? <><Spinner /> Sending OTP...</> : phoneVerificationToken ? "Contact Phone Verified" : otpSent ? "Resend OTP" : "Send OTP"}
+              </button>
+
+              {otpSent && !phoneVerificationToken && (
+                <div className="flex gap-2">
+                  <input
+                    id="requestOtp"
+                    type="tel"
+                    value={otp}
+                    onChange={(e) => setOtp(e.target.value.replace(/\D/g, ""))}
+                    placeholder="6-digit OTP"
+                    maxLength={6}
+                    className="input-field"
+                    autoComplete="one-time-code"
+                  />
+                  <button
+                    type="button"
+                    onClick={handleVerifyOtp}
+                    disabled={otpVerifying || otp.length !== 6}
+                    className="btn-crimson px-4 text-sm shrink-0"
+                  >
+                    {otpVerifying ? <Spinner /> : "Verify"}
+                  </button>
+                </div>
+              )}
+            </div>
+
             {/* Location — Get Current Location button */}
             <div>
               <p className="form-label">Hospital / Your Location</p>
@@ -389,13 +497,15 @@ const CreateRequestForm = () => {
             </div>
 
             {/* Status Banner */}
+            <div id="request-recaptcha-container" />
+
             {status && <StatusBanner type={status.type} message={status.message} />}
 
             {/* Submit Button */}
             <button
               id="submit-request-btn"
               type="submit"
-              disabled={submitting || locating}
+              disabled={submitting || locating || otpSending || otpVerifying}
               className="btn-crimson w-full flex items-center justify-center gap-2.5 text-base mt-2"
             >
               {submitting ? (

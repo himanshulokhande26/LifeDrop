@@ -1,6 +1,7 @@
 const EmergencyRequest = require("../models/EmergencyRequest");
 const User = require("../models/User");
 const { notifyEligibleDonors } = require("../utils/notificationService");
+const { normalizePhoneNumber, verifyFirebasePhoneToken } = require("../utils/phoneVerificationService");
 
 // ============================================================================
 // @desc    POST /api/requests/create
@@ -25,13 +26,24 @@ const createRequest = async (req, res) => {
       longitude,  // Send as separate numbers from client
       latitude,
       contactPhone,
+      phoneVerificationToken,
     } = req.body;
 
+    const normalizedContactPhone = normalizePhoneNumber(contactPhone);
+
     // --- Basic input validation ---
-    if (!patientName || !requiredBloodGroup || !hospitalName || !longitude || !latitude) {
+    if (!patientName || !requiredBloodGroup || !hospitalName || !longitude || !latitude || !normalizedContactPhone || !phoneVerificationToken) {
       return res.status(400).json({
         success: false,
-        message: "Please provide patientName, requiredBloodGroup, hospitalName, longitude, and latitude.",
+        message: "Please provide patientName, requiredBloodGroup, hospitalName, longitude, latitude, contactPhone and phoneVerificationToken.",
+      });
+    }
+
+    const phoneVerified = await verifyFirebasePhoneToken(phoneVerificationToken, normalizedContactPhone);
+    if (!phoneVerified) {
+      return res.status(401).json({
+        success: false,
+        message: "Firebase phone verification is required before creating a request.",
       });
     }
 
@@ -41,7 +53,8 @@ const createRequest = async (req, res) => {
       requiredBloodGroup,
       hospitalName,
       urgencyLevel: urgencyLevel || "High",
-      contactPhone: contactPhone || "",
+      contactPhone: normalizedContactPhone,
+      contactPhoneVerified: true,
       coordinates: {
         type: "Point",
         // MongoDB uses [longitude, latitude] order

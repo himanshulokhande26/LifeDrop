@@ -11,7 +11,7 @@ Currently, anyone can register with an unverified phone number and claim to have
 This exposes the platform to massive spam, malicious actors creating fake emergencies, and dangerous situations if a donor lies or is mistaken about their blood type.
 
 **Proposed Solution: Strict Verification Gates**
-*   **For Donors (Identity):** Implement an SMS OTP service (e.g., Firebase Phone Auth, Twilio) during registration to ensure the phone number is real and active.
+*   **✅ For Donors (Identity) [IMPLEMENTED in Phase 8.5]:** Implemented Firebase Phone Auth (SMS OTP) during registration to ensure the phone number is real and active.
 *   **For Requesters (Medical Legitimacy):** Introduce a "Proof of Need" step. Requesters must either:
     *   Upload a photo of a doctor's prescription requesting blood.
     *   Enter a verified "Hospital Code".

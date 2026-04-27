@@ -40,6 +40,16 @@ const userSchema = new mongoose.Schema(
       select: false, // Never returned in queries by default
     },
 
+    phoneVerified: {
+      type: Boolean,
+      default: false,
+    },
+
+    phoneVerifiedAt: {
+      type: Date,
+      default: null,
+    },
+
     // Firebase Cloud Messaging token for Web Push Notifications
     fcmToken: {
       type: String,

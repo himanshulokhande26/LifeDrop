@@ -79,6 +79,11 @@ const emergencyRequestSchema = new mongoose.Schema(
       select: false,
     },
 
+    contactPhoneVerified: {
+      type: Boolean,
+      default: false,
+    },
+
     // Created by which registered user (optional for guest requests)
     createdBy: {
       type: mongoose.Schema.Types.ObjectId,

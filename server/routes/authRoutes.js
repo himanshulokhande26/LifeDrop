@@ -1,6 +1,12 @@
 const express = require("express");
 const router = express.Router();
-const { register, login, getMe, updateAvailability, updateFcmToken } = require("../controllers/authController");
+const {
+  register,
+  login,
+  getMe,
+  updateAvailability,
+  updateFcmToken,
+} = require("../controllers/authController");
 const authMiddleware = require("../middleware/authMiddleware");
 
 // Public routes
